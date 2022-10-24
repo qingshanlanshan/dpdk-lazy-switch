@@ -112,7 +112,9 @@ void app_main_loop_forwarding(void)
     uint64_t rtt = app.cpu_freq[rte_lcore_id()] / 1000000 * app.rtt;
     uint64_t init_flowlet_gap = 9 * rtt;
     uint64_t decrease_rate = rtt * 8 / app.k;
-    uint64_t ts1, ts2;
+    uint64_t ts0, ts1, ts2, ts3;
+    app.cyc=0;
+    app.tot_cyc=0;
 
     if (app.log_qlen)
     {
@@ -176,6 +178,7 @@ void app_main_loop_forwarding(void)
     status.timestamp = rte_get_tsc_cycles();
     for (i = 0; !force_quit; i = (i + 1) % app.n_ports)
     {
+        ts0=rte_get_tsc_cycles();
         int ret;
 
         /*ret = rte_ring_sc_dequeue_bulk(
@@ -310,7 +313,6 @@ void app_main_loop_forwarding(void)
                 app_fwd_learning(&key, &value);
                 ts2 = rte_get_tsc_cycles();
                 app.cyc += (ts2 - ts1);
-                RTE_LOG(DEBUG, SWITCH, "%s: flowlet gap detected, forward packet to %d\n", __func__, app.ports[dst_port]);
             }
             else if (ret < 0)
             {
@@ -340,6 +342,8 @@ void app_main_loop_forwarding(void)
                 value.lock=1;
                 app_fwd_learning(&key, &value);
             }
+            ts3=rte_get_tsc_cycles();
+            app.tot_cyc+=(ts3-ts0);
         }
 
         RTE_LOG(

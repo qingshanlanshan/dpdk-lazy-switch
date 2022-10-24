@@ -257,6 +257,7 @@ struct app_params
     uint64_t flowlet_counter;
     int default_port;
     uint64_t cyc;
+    uint64_t tot_cyc;
     uint64_t n_fw;
     int k;
 } __rte_cache_aligned;
