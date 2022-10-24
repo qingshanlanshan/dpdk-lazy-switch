@@ -30,6 +30,10 @@ void app_main_loop_test(void)
             ret = rte_eth_stats_get(i, &port_stats);
             if (ret == 0)
             {
+                if(i==0)
+                {
+                    RTE_LOG(INFO,SWITCH,"\n");
+                }
                 irate = (port_stats.ibytes - port_stats_vector[i].ibytes)  * 8.0 / 1000000;
                 orate = (port_stats.obytes - port_stats_vector[i].obytes)  * 8.0 / 1000000;
                 // loss_rate = (port_stats.ierrors + port_stats.imissed) * 1.0 / (port_stats.ierrors + port_stats.imissed + port_stats.ibytes) * 100;
