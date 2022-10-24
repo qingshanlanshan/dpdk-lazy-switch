@@ -6,7 +6,7 @@ void app_main_loop_test(void)
     uint64_t last_output_time[APP_MAX_PORTS] = {0};
     app.cpu_freq[rte_lcore_id()] = rte_get_tsc_hz();
 
-    uint64_t output_gap = app.cpu_freq[rte_lcore_id()] / 1000 * app.output_interval;
+    uint64_t output_gap = app.cpu_freq[rte_lcore_id()];
     uint32_t i;
     int ret;
     double irate, orate;
