@@ -113,8 +113,8 @@ void app_main_loop_forwarding(void)
     uint64_t init_flowlet_gap = 9 * rtt;
     uint64_t decrease_rate = rtt * 8 / app.k;
     uint64_t ts0, ts1, ts2, ts3;
-    app.cyc=0;
-    app.tot_cyc=0;
+    app.cyc = 0;
+    app.tot_cyc = 0;
 
     if (app.log_qlen)
     {
@@ -178,7 +178,7 @@ void app_main_loop_forwarding(void)
     status.timestamp = rte_get_tsc_cycles();
     for (i = 0; !force_quit; i = (i + 1) % app.n_ports)
     {
-        ts0=rte_get_tsc_cycles();
+        ts0 = rte_get_tsc_cycles();
         int ret;
 
         /*ret = rte_ring_sc_dequeue_bulk(
@@ -218,13 +218,14 @@ void app_main_loop_forwarding(void)
 
             ret = app_fwd_lookup(&key, &value);
             now_time = rte_get_tsc_cycles();
-            if(ret==0&&!status.on){
-                dst_port=value.last_sent_port;
-            }else
-            if (ret == 0 && status.on)
+            if (ret == 0 && !status.on)
+            {
+                dst_port = value.last_sent_port;
+            }
+            else if (ret == 0 && status.on)
             {
                 ts1 = rte_get_tsc_cycles();
-                value.lock=0;
+                value.lock = 0;
                 if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * app.rtt) // letflow
                 {
                     dst_port = rand() % (app.n_ports - 2);
@@ -324,7 +325,7 @@ void app_main_loop_forwarding(void)
                     value.flowlet_gap = init_flowlet_gap;
                 }
                 value.last_sent_time = now_time;
-                value.lock=1;
+                value.lock = 1;
                 if (app.fw_policy != ECMP)
                 {
                     dst_port = rand() % (app.n_ports - 1);
@@ -340,13 +341,13 @@ void app_main_loop_forwarding(void)
                     app_fwd_learning(&key, &value);
                 }
             }
-            if(!status.on&&!value.lock)
+            if (!status.on && !value.lock)
             {
-                value.lock=1;
+                value.lock = 1;
                 app_fwd_learning(&key, &value);
             }
-            ts3=rte_get_tsc_cycles();
-            app.tot_cyc+=(ts3-ts0);
+            ts3 = rte_get_tsc_cycles();
+            app.tot_cyc += (ts3 - ts0);
         }
 
         RTE_LOG(
