@@ -218,6 +218,9 @@ void app_main_loop_forwarding(void)
 
             ret = app_fwd_lookup(&key, &value);
             now_time = rte_get_tsc_cycles();
+            if(ret==0&&!status.on){
+                dst_port=value.last_sent_port;
+            }else
             if (ret == 0 && status.on)
             {
                 ts1 = rte_get_tsc_cycles();
