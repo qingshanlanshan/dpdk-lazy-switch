@@ -225,60 +225,43 @@ void app_main_loop_forwarding(void)
             else if (ret == 0 && status.on)
             {
                 ts1 = rte_get_tsc_cycles();
-                value.lock = 0;
-                if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * app.rtt) // letflow
+                if (value.lock)
                 {
-                    dst_port = rand() % (app.n_ports - 2);
-                    if (dst_port >= app.port)
-                        dst_port++;
-                    if (dst_port >= value.last_sent_port)
-                        dst_port++;
-                    if (dst_port == value.last_sent_port)
-                        dst_port++;
-                    app.flowlet_counter++;
+                    value.lock = 0;
                 }
-                else if (app.fw_policy == Conga && (now_time - value.last_sent_time) > 5 * app.rtt) // conga
+                else
                 {
-                    uint32_t min_qlen = UINT32_MAX;
-                    uint32_t qlen;
-                    for (int j = 0; j < app.n_ports; ++j)
+
+                    if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * app.rtt) // letflow
                     {
-                        if (j == value.last_sent_port || j == app.port)
-                            continue;
-                        qlen = get_qlen_bytes(j);
-                        if (qlen < min_qlen)
-                        {
-                            min_qlen = qlen;
-                            dst_port = j;
-                        }
+                        dst_port = rand() % (app.n_ports - 2);
+                        if (dst_port >= app.port)
+                            dst_port++;
+                        if (dst_port >= value.last_sent_port)
+                            dst_port++;
+                        if (dst_port == value.last_sent_port)
+                            dst_port++;
+                        app.flowlet_counter++;
                     }
-                    app.flowlet_counter++;
-                }
-                else if (app.fw_policy == Drill) // drill
-                {
-                    int randret = rand() % (app.n_ports - 1);
-                    int ban_port = (app.port + randret + 1) % app.n_ports;
-                    uint32_t min_qlen = UINT32_MAX;
-                    uint32_t qlen;
-                    for (int j = 0; j < app.n_ports; ++j)
+                    else if (app.fw_policy == Conga && (now_time - value.last_sent_time) > 5 * app.rtt) // conga
                     {
-                        if (j == app.port || j == ban_port)
-                            continue;
-                        qlen = get_qlen_bytes(j);
-                        if (qlen < min_qlen)
+                        uint32_t min_qlen = UINT32_MAX;
+                        uint32_t qlen;
+                        for (int j = 0; j < app.n_ports; ++j)
                         {
-                            min_qlen = qlen;
-                            dst_port = j;
+                            if (j == value.last_sent_port || j == app.port)
+                                continue;
+                            qlen = get_qlen_bytes(j);
+                            if (qlen < min_qlen)
+                            {
+                                min_qlen = qlen;
+                                dst_port = j;
+                            }
                         }
+                        app.flowlet_counter++;
                     }
-                }
-                else if (app.fw_policy == Halflife) // halflife
-                {
-                    if (value.flowlet_gap > rtt)
-                        value.flowlet_gap -= decrease_rate;
-                    if ((now_time - value.last_sent_time) > value.flowlet_gap)
+                    else if (app.fw_policy == Drill) // drill
                     {
-                        value.flowlet_gap = init_flowlet_gap;
                         int randret = rand() % (app.n_ports - 1);
                         int ban_port = (app.port + randret + 1) % app.n_ports;
                         uint32_t min_qlen = UINT32_MAX;
@@ -295,28 +278,52 @@ void app_main_loop_forwarding(void)
                             }
                         }
                     }
-                    app.flowlet_counter++;
-                }
-                else if (app.fw_policy == ECMP) // per-flow ECMP
-                {
-                    dst_port = value.last_sent_port;
-                }
-                else if (app.fw_policy == Random) // random
-                {
-                    dst_port = rand() % (app.n_ports - 2);
-                    if (dst_port >= app.port)
-                        dst_port++;
-                    if (dst_port >= value.last_sent_port)
-                        dst_port++;
-                    if (dst_port == value.last_sent_port)
-                        dst_port++;
-                }
+                    else if (app.fw_policy == Halflife) // halflife
+                    {
+                        if (value.flowlet_gap > rtt)
+                            value.flowlet_gap -= decrease_rate;
+                        if ((now_time - value.last_sent_time) > value.flowlet_gap)
+                        {
+                            value.flowlet_gap = init_flowlet_gap;
+                            int randret = rand() % (app.n_ports - 1);
+                            int ban_port = (app.port + randret + 1) % app.n_ports;
+                            uint32_t min_qlen = UINT32_MAX;
+                            uint32_t qlen;
+                            for (int j = 0; j < app.n_ports; ++j)
+                            {
+                                if (j == app.port || j == ban_port)
+                                    continue;
+                                qlen = get_qlen_bytes(j);
+                                if (qlen < min_qlen)
+                                {
+                                    min_qlen = qlen;
+                                    dst_port = j;
+                                }
+                            }
+                        }
+                        app.flowlet_counter++;
+                    }
+                    else if (app.fw_policy == ECMP) // per-flow ECMP
+                    {
+                        dst_port = value.last_sent_port;
+                    }
+                    else if (app.fw_policy == Random) // random
+                    {
+                        dst_port = rand() % (app.n_ports - 2);
+                        if (dst_port >= app.port)
+                            dst_port++;
+                        if (dst_port >= value.last_sent_port)
+                            dst_port++;
+                        if (dst_port == value.last_sent_port)
+                            dst_port++;
+                    }
 
-                value.last_sent_time = now_time;
-                value.last_sent_port = dst_port;
-                app_fwd_learning(&key, &value);
-                ts2 = rte_get_tsc_cycles();
-                app.cyc += (ts2 - ts1);
+                    value.last_sent_time = now_time;
+                    value.last_sent_port = dst_port;
+                    app_fwd_learning(&key, &value);
+                    ts2 = rte_get_tsc_cycles();
+                    app.cyc += (ts2 - ts1);
+                }
             }
             else if (ret < 0)
             {
