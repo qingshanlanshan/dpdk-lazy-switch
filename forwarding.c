@@ -198,7 +198,7 @@ void app_main_loop_forwarding(void)
         }
         else
         {
-            dst_port = default_port;
+            // dst_port = default_port;
             ipv4_5tuple = rte_pktmbuf_mtod_offset(worker_mbuf->array[0], struct ipv4_5tuple_host *, sizeof(struct ether_hdr) + offsetof(struct ipv4_hdr, time_to_live));
 
             key.ip = ipv4_5tuple->ip_src;
@@ -210,7 +210,7 @@ void app_main_loop_forwarding(void)
                 status.on = 0;
                 status.timestamp = now_time;
             }
-            else if (!status.on && now_time - status.timestamp > app.rtt * 80)
+            else if (!status.on && now_time - status.timestamp > app.rtt * 100)
             {
                 status.on = 1;
                 status.timestamp = now_time;
@@ -228,6 +228,7 @@ void app_main_loop_forwarding(void)
                 if (value.lock)
                 {
                     value.lock = 0;
+                    dst_port = value.last_sent_port;
                 }
                 else
                 {
