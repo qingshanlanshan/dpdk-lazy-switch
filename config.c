@@ -4,13 +4,14 @@
 
 static const char usage[] = "./<app name> [EAL options] -- -p PORTMASK\n";
 
-void
-app_print_usage(void) {
+void app_print_usage(void)
+{
     printf("USAGE: %s", usage);
 }
 
 static int
-app_parse_port_mask(const char *arg) {
+app_parse_port_mask(const char *arg)
+{
     char *end = NULL;
     uint64_t port_mask;
     uint32_t i;
@@ -22,28 +23,29 @@ app_parse_port_mask(const char *arg) {
     if ((end == NULL) || (*end != '\0'))
         return -2;
 
-    if (port_mask == 0) {
+    if (port_mask == 0)
+    {
         RTE_LOG(
             ERR, SWITCH,
             "%s: no port specified\n",
-            __func__
-        );
+            __func__);
         return -3;
     }
 
     app.n_ports = 0;
-    for (i = 0; i < 64; i++) {
+    for (i = 0; i < 64; i++)
+    {
         if ((port_mask & (1LLU << i)) == 0)
             continue;
 
-        if (app.n_ports >= APP_MAX_PORTS) {
-            RTE_LOG(
-                ERR, SWITCH,
-                "%s: # of ports (%u) is larger than maximum supported port number (%u)\n",
-                __func__, app.n_ports, APP_MAX_PORTS
-            );
-            return -4;
-        }
+        // if (app.n_ports >= APP_MAX_PORTS)
+        // {
+        //     RTE_LOG(
+        //         ERR, SWITCH,
+        //         "%s: # of ports (%u) is larger than maximum supported port number (%u)\n",
+        //         __func__, app.n_ports, APP_MAX_PORTS);
+        //     return -4;
+        // }
 
         app.ports[app.n_ports] = i;
 
@@ -51,27 +53,26 @@ app_parse_port_mask(const char *arg) {
             INFO, SWITCH,
             "%s: port map: app.n_ports[%u] = %u\n",
             __func__,
-            app.n_ports, i
-        );
+            app.n_ports, i);
 
         app.n_ports++;
     }
 
-    if (!rte_is_power_of_2(app.n_ports)) {
-        RTE_LOG(
-            WARNING, SWITCH,
-            "%s: # of ports (%u) is not power of 2\n",
-            __func__, app.n_ports
-        );
-        return -5;
-    }
+    // if (!rte_is_power_of_2(app.n_ports))
+    // {
+    //     RTE_LOG(
+    //         WARNING, SWITCH,
+    //         "%s: # of ports (%u) is not power of 2\n",
+    //         __func__, app.n_ports);
+    //     return -5;
+    // }
 
     return 0;
 }
 
-
 static int
-app_read_config_file(const char *fname) {
+app_read_config_file(const char *fname)
+{
     struct app_configs app_cfg = {
         .shared_memory = cfg_false,
         .buffer_size_kb = -1,
@@ -83,9 +84,16 @@ app_read_config_file(const char *fname) {
         .ecn_enable = cfg_false,
         .ecn_thresh_kb = -1,
         .tx_rate_mbps = -1,
+        .tx_rate_mbps_vector = {-1, -1, -1, -1, -1},
+        .port = -1,
         .bucket_size = -1,
-        .cfg = NULL
-    };
+        .rtt=500,
+        .fw_policy = 0,
+        // .test_info_output = 1,
+        .output_interval=1000,
+        .default_port=1,
+        .k=1000,
+        .cfg = NULL};
     cfg_opt_t opts[] = {
         CFG_SIMPLE_BOOL("shared_memory", &app_cfg.shared_memory),
         CFG_SIMPLE_INT("buffer_size", &app_cfg.buffer_size_kb),
@@ -97,31 +105,47 @@ app_read_config_file(const char *fname) {
         CFG_SIMPLE_BOOL("ecn_enable", &app_cfg.ecn_enable),
         CFG_SIMPLE_INT("ecn_threshold", &app_cfg.ecn_thresh_kb),
         CFG_SIMPLE_INT("tx_rate_mbps", &app_cfg.tx_rate_mbps),
+        CFG_SIMPLE_INT("tx_rate_mbps_0", &app_cfg.tx_rate_mbps_vector[0]),
+        CFG_SIMPLE_INT("tx_rate_mbps_1", &app_cfg.tx_rate_mbps_vector[1]),
+        CFG_SIMPLE_INT("tx_rate_mbps_2", &app_cfg.tx_rate_mbps_vector[2]),
+        CFG_SIMPLE_INT("tx_rate_mbps_3", &app_cfg.tx_rate_mbps_vector[3]),
+        CFG_SIMPLE_INT("tx_rate_mbps_4", &app_cfg.tx_rate_mbps_vector[4]),
         CFG_SIMPLE_INT("bucket_size", &app_cfg.bucket_size),
-        CFG_END()
-    };
+        CFG_SIMPLE_INT("port", &app_cfg.port),
+        CFG_SIMPLE_INT("default_port", &app_cfg.default_port),
+        CFG_SIMPLE_INT("rtt", &app_cfg.rtt),
+        CFG_SIMPLE_INT("k", &app_cfg.k),
+        // CFG_SIMPLE_INT("output_interval", &app_cfg.output_interval),
+        CFG_SIMPLE_INT("forwarding_policy", &app_cfg.fw_policy),
+        CFG_END()};
     app_cfg.cfg = cfg_init(opts, 0);
-    if (cfg_parse(app_cfg.cfg, fname) == CFG_FILE_ERROR) {
+
+    if (cfg_parse(app_cfg.cfg, fname) == CFG_FILE_ERROR)
+    {
         RTE_LOG(
             ERR, SWITCH,
             "%s: Configuration file '%s' cannot open for reading.\n",
-            __func__, fname
-        );
-        if (app_cfg.cfg != NULL) {
+            __func__, fname);
+        if (app_cfg.cfg != NULL)
+        {
             cfg_free(app_cfg.cfg);
         }
-        if (app_cfg.bm_policy != NULL) {
+        if (app_cfg.bm_policy != NULL)
+        {
             free(app_cfg.bm_policy);
         }
-        if (app_cfg.qlen_fname != NULL) {
+        if (app_cfg.qlen_fname != NULL)
+        {
             free(app_cfg.qlen_fname);
         }
         return 1;
     }
-    app.buff_size_bytes = (app_cfg.buffer_size_kb > 0 ? (app_cfg.buffer_size_kb<<10) : app.buff_size_bytes);
-    if (app_cfg.shared_memory) {
+    app.buff_size_bytes = (app_cfg.buffer_size_kb > 0 ? (app_cfg.buffer_size_kb << 10) : app.buff_size_bytes);
+    if (app_cfg.shared_memory)
+    {
         app.shared_memory = 1;
-        if (!strcmp(app_cfg.bm_policy, "Equal Division")) {
+        if (!strcmp(app_cfg.bm_policy, "Equal Division"))
+        {
             app.get_threshold = qlen_threshold_equal_division;
             RTE_LOG(
                 INFO, SWITCH,
@@ -129,94 +153,135 @@ app_read_config_file(const char *fname) {
                 __func__,
                 app_cfg.bm_policy,
                 app.buff_size_bytes,
-                app.buff_size_bytes/1024
-            );
-        } else if (!strcmp(app_cfg.bm_policy, "Dynamic Threshold")
-                || !strcmp(app_cfg.bm_policy, "DT")) {
+                app.buff_size_bytes / 1024);
+        }
+        else if (!strcmp(app_cfg.bm_policy, "Dynamic Threshold") || !strcmp(app_cfg.bm_policy, "DT"))
+        {
             RTE_LOG(
                 INFO, SWITCH,
                 "%s: shared memory enabled, bm_policy: Dynamic Threshold,\
                 buffer_size: %uB=%uKiB, dt_shift_alpha: %u\n",
                 __func__,
                 app.buff_size_bytes,
-                app.buff_size_bytes/1024,
-                app.dt_shift_alpha
-            );
+                app.buff_size_bytes / 1024,
+                app.dt_shift_alpha);
             app.get_threshold = qlen_threshold_dt;
             app.dt_shift_alpha = (app_cfg.dt_shift_alpha >= 0 ? app_cfg.dt_shift_alpha : app.dt_shift_alpha);
-        } else {
+        }
+        else
+        {
             RTE_LOG(
                 ERR, SWITCH,
                 "%s: Unsupported buffer management policy: %s, disable shared memory.\n",
-                __func__, app_cfg.bm_policy
-            );
+                __func__, app_cfg.bm_policy);
             app.shared_memory = 0;
         }
     }
-    if (app_cfg.log_qlen) {
-        if (app_cfg.qlen_fname == NULL) {
+    if (app_cfg.log_qlen)
+    {
+        if (app_cfg.qlen_fname == NULL)
+        {
             RTE_LOG(
                 ERR, SWITCH,
                 "%s: Enable queue length log, but log file name is not specified.\n",
-                __func__
-            );
-        } else {
+                __func__);
+        }
+        else
+        {
             app.qlen_file = fopen(app_cfg.qlen_fname, "w");
-            if (app.qlen_file == NULL) {
+            if (app.qlen_file == NULL)
+            {
                 perror("Open file error:");
                 RTE_LOG(
                     ERR, SWITCH,
                     "%s: Cannot open queue length log file '%s'\n",
-                    __func__, app_cfg.qlen_fname
-                );
-            } else {
+                    __func__, app_cfg.qlen_fname);
+            }
+            else
+            {
                 app.log_qlen = 1;
-                if (app_cfg.log_qlen_port >= 0 && app_cfg.log_qlen_port < app.n_ports) {
+                if (app_cfg.log_qlen_port >= 0 && app_cfg.log_qlen_port < app.n_ports)
+                {
                     app.log_qlen_port = app_cfg.log_qlen_port;
-                } else {
+                }
+                else
+                {
                     app.log_qlen_port = app.n_ports;
                     RTE_LOG(
                         WARNING, SWITCH,
                         "%s: The log queue length port (%ld) is invalid. \
                         Queue length logging is enabled for all ports.",
-                        __func__, app_cfg.log_qlen_port
-                    );
+                        __func__, app_cfg.log_qlen_port);
                 }
             }
         }
     }
-    if (app.log_qlen) {
-        if (app.log_qlen_port >= 0 && app.log_qlen_port < app.n_ports) {
+    if (app.log_qlen)
+    {
+        if (app.log_qlen_port >= 0 && app.log_qlen_port < app.n_ports)
+        {
             RTE_LOG(
                 INFO, SWITCH,
                 "%s: Queue length logging is enabled for port %u. Logging is dumped into file %s\n",
-                __func__, app.log_qlen_port, app_cfg.qlen_fname
-            );
-        } else {
+                __func__, app.log_qlen_port, app_cfg.qlen_fname);
+        }
+        else
+        {
             RTE_LOG(
                 WARNING, SWITCH,
                 "%s: Queue length logging is enabled for all ports. \
                 Logging is dumped into file %s\n",
-                __func__, app_cfg.qlen_fname
-            );
+                __func__, app_cfg.qlen_fname);
         }
     }
-    if (app_cfg.ecn_enable && app_cfg.ecn_thresh_kb >= 0) {
+    if (app_cfg.ecn_enable && app_cfg.ecn_thresh_kb >= 0)
+    {
         app.ecn_enable = 1;
         app.ecn_thresh_kb = app_cfg.ecn_thresh_kb;
-    } else {
+    }
+    else
+    {
         app.ecn_enable = 0;
         app.ecn_thresh_kb = 0;
     }
     app.tx_rate_mbps = (app_cfg.tx_rate_mbps >= 0 ? app_cfg.tx_rate_mbps : 0);
-    app.bucket_size = (app_cfg.bucket_size > ETHER_MIN_LEN ? app_cfg.bucket_size: app.bucket_size);
-    if (app_cfg.bucket_size < ETHER_MAX_LEN) {
+    for (int i = 0; i < app.n_ports; ++i)
+    {
+        app.tx_rate_mbps_vector[i] = (app_cfg.tx_rate_mbps_vector[i] >= 0 ? app_cfg.tx_rate_mbps_vector[i] : 0);
+    }
+    app.bucket_size = (app_cfg.bucket_size > ETHER_MIN_LEN ? app_cfg.bucket_size : app.bucket_size);
+    if (app_cfg.bucket_size < ETHER_MAX_LEN)
+    {
         RTE_LOG(
             WARNING, SWITCH,
             "%s: TBF bucket size (given %ldB) is smaller than MTU(%uB)\n",
-            __func__, app_cfg.bucket_size, ETHER_MAX_LEN
-        );
+            __func__, app_cfg.bucket_size, ETHER_MAX_LEN);
     }
+
+    app.port = app_cfg.port;
+    RTE_LOG(
+        INFO, SWITCH,
+        "%s: port = %d.\n",
+        __func__, app.port);
+    app.rtt = app_cfg.rtt;
+    RTE_LOG(
+        INFO, SWITCH,
+        "%s: rtt = %d.\n",
+        __func__, app.rtt);
+    // app.test_info_output = app_cfg.test_info_output;
+    // RTE_LOG(
+    //     INFO, SWITCH,
+    //     "%s: test_info_output = %d.\n",
+    //     __func__, app.test_info_output);
+    app.default_port=app_cfg.default_port;
+    app.k = app_cfg.k;
+    app.fw_policy = app_cfg.fw_policy;
+    RTE_LOG(
+        INFO, SWITCH,
+        "%s: fw_policy = %d.\n",
+        __func__, app.fw_policy);
+    app.output_interval=app_cfg.output_interval;
+
     cfg_free(app_cfg.cfg);
     free(app_cfg.bm_policy);
     free(app_cfg.qlen_fname);
@@ -258,8 +323,8 @@ static void app_finish_config(void) {
     );
 }
 
-int
-app_parse_args(int argc, char **argv) {
+int app_parse_args(int argc, char **argv)
+{
     int opt, ret;
     char **argvopt;
     int option_index;
@@ -273,10 +338,13 @@ app_parse_args(int argc, char **argv) {
     argvopt = argv;
 
     while ((opt = getopt_long(argc, argvopt, "p:",
-            lgopts, &option_index)) != EOF) {
-        switch (opt) {
+                              lgopts, &option_index)) != EOF)
+    {
+        switch (opt)
+        {
         case 'p':
-            if (app_parse_port_mask(optarg) < 0) {
+            if (app_parse_port_mask(optarg) < 0)
+            {
                 return -1;
             }
             break;
@@ -288,7 +356,8 @@ app_parse_args(int argc, char **argv) {
 
     /* EAL args */
     n_lcores = 0;
-    for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++) {
+    for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++)
+    {
         if (rte_lcore_is_enabled(lcore_id) == 0)
             continue;
 
@@ -296,16 +365,19 @@ app_parse_args(int argc, char **argv) {
         n_lcores++;
     }
 
-    //if (n_lcores != 2+app.n_ports) {
-    if (n_lcores < 3) {
-        RTE_LOG(ERR, SWITCH, "# of cores must be larger than 3.\n");
+    // if (n_lcores != 2+app.n_ports) {
+    if (n_lcores < 4)
+    {
+        RTE_LOG(ERR, SWITCH, "# of cores must be larger than 4.\n");
         return -1;
     }
 
     app.core_rx = lcores[0];
     app.core_worker = lcores[1];
-    for (i = 0; i < n_lcores-2; i++) {
-        app.core_tx[i] = lcores[i+2];
+    app.core_test = lcores[2];
+    for (i = 0; i < n_lcores - 3; i++)
+    {
+        app.core_tx[i] = lcores[i + 3];
     }
     app.n_lcores = n_lcores;
     if (optind >= 0)
@@ -317,4 +389,3 @@ app_parse_args(int argc, char **argv) {
     app_finish_config();
     return ret;
 }
-

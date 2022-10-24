@@ -45,7 +45,18 @@ struct app_params app = {
 	.ecn_enable = 0,
 	.ecn_thresh_kb = 0,
     .tx_rate_mbps = 0,
+    .tx_rate_mbps_vector={0},
+    .port=0,
+    .rtt=500,
 	.bucket_size = 3200,
+    .fw_policy=-1,
+    // .test_info_output=0,
+    .orate={0},
+    .flowlet_counter=0,
+    .default_port=1,
+    .cyc=0,
+    .n_fw=0,
+    .k=1000,
 };
 
 static struct rte_eth_conf port_conf = {
@@ -195,14 +206,18 @@ app_ports_check_link(void) {
 static void
 app_init_ports(void) {
     uint32_t i;
-
+    
     /* Init NIC ports, then start the ports */
     for (i = 0; i < app.n_ports; i++) {
         uint8_t port;
         int ret;
 
         port = (uint8_t) app.ports[i];
-        RTE_LOG(INFO, SWITCH, "Initializing NIC port %u ...\n", port);
+        // RTE_LOG(INFO, SWITCH, "Initializing NIC port %u ...\n", port);
+
+        struct rte_eth_dev_info dev_info;
+        rte_eth_dev_info_get(i,&dev_info);
+        RTE_LOG(INFO, SWITCH, "Initializing NIC port %u (pci= %04x:%02x:%02x.%x)\n", port,dev_info.pci_dev->addr.domain,dev_info.pci_dev->addr.bus,dev_info.pci_dev->addr.devid,dev_info.pci_dev->addr.function);
 
         /* Init port */
         ret = rte_eth_dev_configure(
@@ -262,17 +277,43 @@ int app_init_forwarding_table(const char* tname) {
     struct rte_hash_parameters hash_params = {
         .name = app.ft_name,
         .entries = FORWARD_ENTRY,
-        .key_len = sizeof(struct ether_addr),
+        .key_len = sizeof(struct flow_key),
         .hash_func = rte_hash_crc,
         .hash_func_init_val = 0,
     };
-    app.l2_hash = rte_hash_create(&hash_params);
-    if (app.l2_hash == NULL) {
+    app.fwd_hash = rte_hash_create(&hash_params);
+    if (app.fwd_hash == NULL) {
         RTE_LOG(ERR, HASH, "%s: ERROR when create hash table.\n", __func__);
         return -1;
     }
     return 0;
 }
+
+// int app_init_mac_table(const char* tname) {
+//     size_t name_len = strlen(tname);
+//     if (name_len > MAX_NAME_LEN) {
+//         RTE_LOG(
+//             ERR, HASH,
+//             "%s: ERROR when init forward table: table name too long\n",
+//             __func__
+//         );
+//         return -1;
+//     }
+//     rte_memcpy(app.ft_name, tname, name_len);
+//     struct rte_hash_parameters hash_params = {
+//         .name = app.ft_name,
+//         .entries = FORWARD_ENTRY,
+//         .key_len = sizeof(struct ether_addr),
+//         .hash_func = rte_hash_crc,
+//         .hash_func_init_val = 0,
+//     };
+//     app.l2_hash = rte_hash_create(&hash_params);
+//     if (app.l2_hash == NULL) {
+//         RTE_LOG(ERR, HASH, "%s: ERROR when create hash table.\n", __func__);
+//         return -1;
+//     }
+//     return 0;
+// }
 
 void
 app_init(void) {
@@ -280,6 +321,7 @@ app_init(void) {
     app_init_rings();
     app_init_ports();
     app_init_forwarding_table("forwarding table");
+    // app_init_mac_table("mac table");
     app_init_locks();
 
     RTE_LOG(INFO, SWITCH, "Initialization completed\n");

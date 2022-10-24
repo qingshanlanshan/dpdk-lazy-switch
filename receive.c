@@ -8,7 +8,9 @@ app_main_loop_rx(void) {
     RTE_LOG(INFO, SWITCH, "Core %u is doing RX\n", rte_lcore_id());
 
     app.cpu_freq[rte_lcore_id()] = rte_get_tsc_hz();
-    for (i = 0; !force_quit ; i = ((i + 1) & (app.n_ports - 1))) {
+    // for (i = 0; !force_quit ; i = ((i + 1) & (app.n_ports - 1))) 
+    for (i = 0; !force_quit ; i = (i+1)%app.n_ports) 
+    {
         uint16_t n_mbufs;
 
         n_mbufs = rte_eth_rx_burst(

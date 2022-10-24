@@ -50,6 +50,10 @@
 #include <sys/queue.h>
 #include <sys/time.h>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <rte_common.h>
 #include <rte_byteorder.h>
 #include <rte_log.h>
@@ -90,34 +94,45 @@
 #undef RTE_LOG_LEVEL
 #define RTE_LOG_LEVEL RTE_LOG_DEBUG
 
-#define FORWARD_ENTRY 10 // # of forwarding table entries
+#define FORWARD_ENTRY 1024 // # of forwarding table entries
 #define MAX_NAME_LEN 100
 #define VALID_TIME INT_MAX // valid time (in ms) for a forwarding item
-#define MEAN_PKT_SIZE 800 // used for calculate ring length and # of mbuf pools
-#define RATE_SCALE 20 // the scale of tx rate
+#define MEAN_PKT_SIZE 800  // used for calculate ring length and # of mbuf pools
+#define RATE_SCALE 20      // the scale of tx rate
 
- #define MIN(a,b) \
-   ({ __typeof__ (a) _a = (a); \
+#define MIN(a, b) \
+    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
-typedef uint32_t (* get_threshold_callback_fn)(uint32_t port_id);
-struct app_mbuf_array {
+typedef uint32_t (*get_threshold_callback_fn)(uint32_t port_id);
+struct app_mbuf_array
+{
     struct rte_mbuf *array[APP_MBUF_ARRAY_SIZE];
     uint16_t n_mbufs;
 };
 
 #ifndef APP_MAX_PORTS
-#define APP_MAX_PORTS 4
+#define APP_MAX_PORTS 8
 #endif
 
-struct app_fwd_table_item {
+struct app_fwd_table_item
+{
+    int last_sent_port;
+    /* the time (in cpu frequency) when the item is added */
+    uint64_t last_sent_time;
+    uint64_t flowlet_gap;
+    bool lock;
+};
+
+struct app_mac_table_item {
     uint8_t port_id;
     /* the time (in cpu frequency) when the item is added */
     uint64_t timestamp;
 };
 
-struct app_configs {
+struct app_configs
+{
     cfg_bool_t shared_memory;
     long buffer_size_kb;
     long dt_shift_alpha;
@@ -128,20 +143,30 @@ struct app_configs {
     cfg_bool_t ecn_enable;
     long ecn_thresh_kb;
     long tx_rate_mbps;
+    long tx_rate_mbps_vector[APP_MAX_PORTS];
+    int port;
+    uint64_t rtt;
+    char *fw_policy;
     long bucket_size; /* bucket size (in bytes) of TBF algorithm */
     cfg_t *cfg;
+    // int test_info_output;
+    int output_interval;
+    int default_port;
+    int k;
 };
 
 extern struct app_configs app_cfg;
 
 extern volatile bool force_quit;
-struct app_params {
+struct app_params
+{
     uint64_t cpu_freq[RTE_MAX_LCORE];
     uint64_t start_cycle;
     /* CPU cores */
     uint32_t n_lcores;
     uint32_t core_rx;
     uint32_t core_worker;
+    uint32_t core_test;
     uint32_t core_tx[RTE_MAX_LCORE];
 
     /* Ports*/
@@ -154,21 +179,20 @@ struct app_params {
     uint32_t buff_size_bytes;
     uint32_t buff_size_per_port_bytes;
     uint32_t
-        shared_memory:1, /* whether enable shared memory */
+        shared_memory : 1, /* whether enable shared memory */
         /* whether log queue length and the file to put log in */
-        log_qlen:1,
+        log_qlen : 1,
         /* the port to log queue length */
-        log_qlen_port:5,
-        dt_shift_alpha:14, /* parameter alpha of DT = 1 << dt_shift_alpha*/
-        ecn_enable:1,
-        unused:10;
+        log_qlen_port : 5,
+        dt_shift_alpha : 14, /* parameter alpha of DT = 1 << dt_shift_alpha*/
+        ecn_enable : 1,
+        unused : 10;
     uint64_t qlen_start_cycle;
 
-    FILE* qlen_file;
+    FILE *qlen_file;
     /*rte_rwlock_t lock_bocu;*/
     rte_spinlock_t lock_buff;
     get_threshold_callback_fn get_threshold;
-
 
     /* buffer occupancy*/
     uint32_t buff_bytes_in;
@@ -210,17 +234,56 @@ struct app_params {
 
     /* things about forwarding table */
     struct app_fwd_table_item fwd_table[FORWARD_ENTRY];
+    struct app_mac_table_item mac_table[FORWARD_ENTRY];
     char ft_name[MAX_NAME_LEN]; /* forward table name */
-    struct rte_hash* l2_hash;
+    struct rte_hash *l2_hash;
+    struct rte_hash *fwd_hash;
     uint64_t fwd_item_valid_time; /* valide time of forward item, in CPU cycles */
 
     uint32_t ecn_thresh_kb;
     uint64_t tx_rate_scale[APP_MAX_PORTS]; /* tx rate in bytes per CPU cycle * (1<<RATE_SCALE)*/
-    uint64_t tx_rate_mbps; /* the rate (in byte per second) from tx ring to tx queue */
-    uint32_t bucket_size; /* bucket size (in bytes) of TBF algorithm */
-    uint64_t token[APP_MAX_PORTS]; /* # of tokens in each port */
-    uint64_t prev_time[APP_MAX_PORTS]; /* previous time in cycles to generate tokens */
+    uint64_t tx_rate_mbps;                 /* the rate (in byte per second) from tx ring to tx queue */
+    uint32_t bucket_size;                  /* bucket size (in bytes) of TBF algorithm */
+    uint64_t token[APP_MAX_PORTS];         /* # of tokens in each port */
+    uint64_t prev_time[APP_MAX_PORTS];     /* previous time in cycles to generate tokens */
+
+    uint64_t tx_rate_mbps_vector[APP_MAX_PORTS];
+    int port;
+    uint64_t rtt;
+    int fw_policy;
+    // int test_info_output;
+    int output_interval;
+    double orate[APP_MAX_PORTS];
+    uint64_t flowlet_counter;
+    int default_port;
+    uint64_t cyc;
+    uint64_t n_fw;
+    int k;
 } __rte_cache_aligned;
+
+struct ipv4_5tuple_host
+{
+    uint8_t pad0;
+    uint8_t proto;
+    uint16_t pad1;
+    uint32_t ip_src;
+    uint32_t ip_dst;
+    uint16_t port_src;
+    uint16_t port_dst;
+};
+struct flow_key
+{
+    uint32_t ip;
+    uint16_t port;
+};
+enum forwarding_policy{
+    Letflow=0,
+    Conga=1,
+    Drill=2,
+    Halflife=3,
+    ECMP=4,
+    Random=5,
+};
 
 extern struct app_params app;
 
@@ -234,22 +297,28 @@ void app_main_loop_forwarding(void);
 void app_main_loop_tx_each_port(uint32_t);
 void app_main_loop_tx(void);
 void app_main_tx_port(uint32_t);
+void app_main_loop_test(void);
 
 /*
  * Initialize forwarding table.
  * Return 0 when OK, -1 when there is error.
  */
 int app_init_forwarding_table(const char *tname);
+int app_init_mac_table(const char *tname);
 
 /*
  * Return 0 when OK, -1 when there is error.
  */
-int app_l2_learning(const struct ether_addr* srcaddr, uint8_t port);
+// int app_l2_learning(const struct ether_addr* srcaddr, uint8_t port);
+int app_fwd_learning(struct flow_key *key, struct app_fwd_table_item *value);
 
-/*
- * Return port id to forward (broadcast if negative)
- */
-int app_l2_lookup(const struct ether_addr* addr);
+// /*
+//  * Return port id to forward (broadcast if negative)
+//  */
+// int app_l2_lookup(const struct ether_addr* addr);
+int app_fwd_lookup(const struct flow_key *key, struct app_fwd_table_item *value);
+
+// bool is_host_port(int j);
 
 uint32_t get_qlen_bytes(uint32_t port_id);
 uint32_t get_buff_occu_bytes(void);
@@ -258,17 +327,16 @@ uint32_t get_buff_occu_bytes(void);
  * Returns:
  *  0: succeed, < 0: packet dropped
  *  -1: queue length > threshold, -2: buffer overflow, -3: other unknown reason
-*/
+ */
 int packet_enqueue(uint32_t dst_port, struct rte_mbuf *pkt);
 
 /*
  * Get port qlen threshold for a port
  * if queue length for a port is larger than threshold, then packets are dropped.
-*/
+ */
 uint32_t qlen_threshold_equal_division(uint32_t port_id);
 /* dynamic threshold */
 uint32_t qlen_threshold_dt(uint32_t port_id);
-
 
 #define APP_FLUSH 0
 #ifndef APP_FLUSH

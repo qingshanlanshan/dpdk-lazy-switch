@@ -53,6 +53,7 @@ SRCS-y += receive.c
 SRCS-y += forwarding.c
 SRCS-y += transmit.c
 SRCS-y += output_queue.c
+SRCS-y += test.c
 
 include $(RTE_SDK)/mk/rte.extapp.mk
 
