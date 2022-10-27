@@ -10,6 +10,25 @@ ecn_enable = false
 # ecn threshold in KB
 ecn_threshold = 32
 # rate limit
-tx_rate_mbps = 9999
+tx_rate_mbps = 99999
+tx_rate_mbps_0 = 99999
+tx_rate_mbps_1 = 99999
+tx_rate_mbps_2 = 9999
+tx_rate_mbps_3 = 9999
+tx_rate_mbps_4 = 4999
 # bucket size in bytes
 bucket_size = 5000
+# host port
+port = 0
+# flowlet forwarding policy: 0=Letflow 1=CONGA 2=DRILL 3=Halflife 4=per-flow ECMP 5=random
+forwarding_policy = 4
+# default forwarding port
+default_port=1
+# flowlet num to reach min ft(Halflife)
+k=1000
+# RTT in us
+rtt=30
+# T_on/RTT
+ratio_on=8
+# T_off/T_on
+ratio_off=10

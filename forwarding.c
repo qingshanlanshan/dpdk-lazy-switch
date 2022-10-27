@@ -115,6 +115,8 @@ void app_main_loop_forwarding(void)
     uint64_t ts0, ts1, ts2, ts3;
     app.cyc = 0;
     app.tot_cyc = 0;
+    const uint64_t T_on = app.rtt * app.ratio_on;
+    const uint64_t T_off = app.rtt * app.ratio_on * app.ratio_off;
 
     if (app.log_qlen)
     {
@@ -205,15 +207,18 @@ void app_main_loop_forwarding(void)
             key.port = ipv4_5tuple->port_src;
 
             uint64_t now_time = rte_get_tsc_cycles();
-            if (status.on && now_time - status.timestamp > app.rtt * 8)
+            if (app.ratio_off)
             {
-                status.on = 0;
-                status.timestamp = now_time;
-            }
-            else if (!status.on && now_time - status.timestamp > app.rtt * 100)
-            {
-                status.on = 1;
-                status.timestamp = now_time;
+                if (status.on && now_time - status.timestamp > T_on)
+                {
+                    status.on = 0;
+                    status.timestamp = now_time;
+                }
+                else if (!status.on && now_time - status.timestamp > T_off)
+                {
+                    status.on = 1;
+                    status.timestamp = now_time;
+                }
             }
 
             ret = app_fwd_lookup(&key, &value);

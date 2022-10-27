@@ -93,6 +93,8 @@ app_read_config_file(const char *fname)
         .output_interval=1000,
         .default_port=1,
         .k=1000,
+        .ratio_off=10,
+        .ratio_on=8,
         .cfg = NULL};
     cfg_opt_t opts[] = {
         CFG_SIMPLE_BOOL("shared_memory", &app_cfg.shared_memory),
@@ -115,7 +117,8 @@ app_read_config_file(const char *fname)
         CFG_SIMPLE_INT("default_port", &app_cfg.default_port),
         CFG_SIMPLE_INT("rtt", &app_cfg.rtt),
         CFG_SIMPLE_INT("k", &app_cfg.k),
-        // CFG_SIMPLE_INT("output_interval", &app_cfg.output_interval),
+        CFG_SIMPLE_INT("ratio_on", &app_cfg.ratio_on),
+        CFG_SIMPLE_INT("ratio_off", &app_cfg.ratio_off),
         CFG_SIMPLE_INT("forwarding_policy", &app_cfg.fw_policy),
         CFG_END()};
     app_cfg.cfg = cfg_init(opts, 0);
@@ -268,11 +271,8 @@ app_read_config_file(const char *fname)
         INFO, SWITCH,
         "%s: rtt = %d.\n",
         __func__, app.rtt);
-    // app.test_info_output = app_cfg.test_info_output;
-    // RTE_LOG(
-    //     INFO, SWITCH,
-    //     "%s: test_info_output = %d.\n",
-    //     __func__, app.test_info_output);
+    app.ratio_off=app_cfg.ratio_off;
+    app.ratio_on=app_cfg.ratio_on;
     app.default_port=app_cfg.default_port;
     app.k = app_cfg.k;
     app.fw_policy = app_cfg.fw_policy;

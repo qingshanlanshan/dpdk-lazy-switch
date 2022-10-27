@@ -153,6 +153,8 @@ struct app_configs
     int output_interval;
     int default_port;
     int k;
+    int ratio_on;
+    int ratio_off;
 };
 
 extern struct app_configs app_cfg;
@@ -260,6 +262,8 @@ struct app_params
     uint64_t tot_cyc;
     uint64_t n_fw;
     int k;
+    int ratio_on;
+    int ratio_off;
 } __rte_cache_aligned;
 
 struct ipv4_5tuple_host
