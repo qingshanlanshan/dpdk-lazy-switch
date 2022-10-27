@@ -207,7 +207,7 @@ void app_main_loop_forwarding(void)
             key.port = ipv4_5tuple->port_src;
 
             uint64_t now_time = rte_get_tsc_cycles();
-            if (app.ratio_off)
+            if (!app.ratio_off)
             {
                 if (status.on && now_time - status.timestamp > T_on)
                 {
