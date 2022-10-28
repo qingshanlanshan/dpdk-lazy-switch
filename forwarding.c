@@ -222,10 +222,10 @@ void app_main_loop_forwarding(void)
             }
 
             ret = app_fwd_lookup(&key, &value);
-            dst_port = value.last_sent_port;
+
             if (ret == 0 && !status.on)
             {
-                
+                dst_port = value.last_sent_port;
             }
             else if (ret == 0 && status.on)
             {
@@ -237,9 +237,9 @@ void app_main_loop_forwarding(void)
                 }
                 else
                 {
-
                     if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * app.rtt) // letflow
                     {
+                        dst_port = value.last_sent_port;
                         dst_port = rand() % (app.n_ports - 2);
                         if (dst_port >= app.port)
                             dst_port++;
@@ -251,6 +251,7 @@ void app_main_loop_forwarding(void)
                     }
                     else if (app.fw_policy == Conga && (now_time - value.last_sent_time) > 5 * app.rtt) // conga
                     {
+                        dst_port = value.last_sent_port;
                         uint32_t min_qlen = UINT32_MAX;
                         uint32_t qlen;
                         for (int j = 0; j < app.n_ports; ++j)
@@ -286,6 +287,7 @@ void app_main_loop_forwarding(void)
                     }
                     else if (app.fw_policy == Halflife) // halflife
                     {
+                        dst_port = value.last_sent_port;
                         if (value.flowlet_gap > rtt)
                             value.flowlet_gap -= decrease_rate;
                         if ((now_time - value.last_sent_time) > value.flowlet_gap)

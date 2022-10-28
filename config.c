@@ -114,7 +114,7 @@ app_read_config_file(const char *fname)
         CFG_SIMPLE_INT("tx_rate_mbps_4", &app_cfg.tx_rate_mbps_vector[4]),
         CFG_SIMPLE_INT("bucket_size", &app_cfg.bucket_size),
         CFG_SIMPLE_INT("port", &app_cfg.port),
-        CFG_SIMPLE_INT("default_port", &app_cfg.default_port),
+        // CFG_SIMPLE_INT("default_port", &app_cfg.default_port),
         CFG_SIMPLE_INT("rtt", &app_cfg.rtt),
         CFG_SIMPLE_INT("k", &app_cfg.k),
         CFG_SIMPLE_INT("ratio_on", &app_cfg.ratio_on),
