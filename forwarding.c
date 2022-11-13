@@ -115,6 +115,7 @@ void app_main_loop_forwarding(void)
     uint64_t ts0, ts1, ts2, ts3;
     app.cyc = 0;
     app.tot_cyc = 0;
+    app.n_loops = 0;
     const uint64_t T_on = app.rtt * app.ratio_on;
     const uint64_t T_off = app.rtt * app.ratio_on * app.ratio_off;
 
@@ -180,6 +181,7 @@ void app_main_loop_forwarding(void)
     status.timestamp = rte_get_tsc_cycles();
     for (i = 0; !force_quit; i = (i + 1) % app.n_ports)
     {
+        app.n_loops++;
         ts0 = rte_get_tsc_cycles();
         int ret;
 

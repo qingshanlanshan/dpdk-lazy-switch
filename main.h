@@ -261,9 +261,11 @@ struct app_params
     uint64_t cyc;
     uint64_t tot_cyc;
     uint64_t n_fw;
+    uint64_t n_loops;
     int k;
     int ratio_on;
     int ratio_off;
+
 } __rte_cache_aligned;
 
 struct ipv4_5tuple_host

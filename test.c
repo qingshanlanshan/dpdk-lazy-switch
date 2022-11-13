@@ -38,8 +38,8 @@ void app_main_loop_test(void)
                 orate = (port_stats.obytes - port_stats_vector[i].obytes)  * 8.0 / 1000000;
                 // loss_rate = (port_stats.ierrors + port_stats.imissed) * 1.0 / (port_stats.ierrors + port_stats.imissed + port_stats.ibytes) * 100;
                 time_in_s = (now_time - base_time) * 1.0 / app.cpu_freq[rte_lcore_id()];
-                RTE_LOG(INFO, SWITCH, "Time: %-5fs Port %d: ipkts=%-10ld  opkts=%-10ld  irate=%-10fMbps orate=%-10fMbps n_flowlet=%ld n_fw=%ld cyc_ratio=%f\%\n",
-                        time_in_s, i, port_stats.ipackets, port_stats.opackets, irate, orate, app.flowlet_counter,app.n_fw,app.cyc*100.0/app.tot_cyc);
+                RTE_LOG(INFO, SWITCH, "Time: %-5fs Port %d: ipkts=%-10ld  opkts=%-10ld  irate=%-10fMbps orate=%-10fMbps n_flowlet=%ld cyc_ratio=%f\%, CPU Load=%f\%\n",
+                        time_in_s, i, port_stats.ipackets, port_stats.opackets, irate, orate, app.flowlet_counter,app.cyc*100.0/app.tot_cyc,1.0*app.n_fw/app.n_loops);
                 // fprintf(fp, "Time: %-5fs Port %d: ipkts=%-10ld opkts=%-10ld irate=%-10fMbps orate=%-10fMbps n_flowlet=%ld n_fw=%ld tot_cyc=%ld\n",
                 //         time_in_s, i, port_stats.ipackets, port_stats.opackets, irate, orate, app.flowlet_counter,app.n_fw,app.cyc);
             }
