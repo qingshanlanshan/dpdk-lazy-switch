@@ -318,8 +318,9 @@ void app_main_loop_forwarding(void)
                                     dst_port = j;
                                 }
                             }
+                            app.flowlet_counter++;
                         }
-                        app.flowlet_counter++;
+                        
                     }
                     else if (app.fw_policy == ECMP) // per-flow ECMP
                     {
