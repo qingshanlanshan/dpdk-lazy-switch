@@ -249,9 +249,9 @@ void app_main_loop_forwarding(void)
                 }
                 else
                 {
+                    dst_port = value.last_sent_port;
                     if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * rtt) // letflow
                     {
-                        dst_port = value.last_sent_port;
                         dst_port = rand() % (app.n_ports - 2);
                         if (dst_port >= app.port)
                             dst_port++;
@@ -263,7 +263,6 @@ void app_main_loop_forwarding(void)
                     }
                     else if (app.fw_policy == Conga && (now_time - value.last_sent_time) > 5 * rtt) // conga
                     {
-                        dst_port = value.last_sent_port;
                         uint32_t min_qlen = UINT32_MAX;
                         uint32_t qlen;
                         for (int j = 0; j < app.n_ports; ++j)
@@ -299,7 +298,6 @@ void app_main_loop_forwarding(void)
                     }
                     else if (app.fw_policy == Halflife) // halflife
                     {
-                        dst_port = value.last_sent_port;
                         if (value.flowlet_gap > rtt)
                             value.flowlet_gap -= decrease_rate;
                         if ((now_time - value.last_sent_time) > value.flowlet_gap)
@@ -325,7 +323,7 @@ void app_main_loop_forwarding(void)
                     }
                     else if (app.fw_policy == ECMP) // per-flow ECMP
                     {
-                        dst_port = value.last_sent_port;
+                        // dst_port = value.last_sent_port;
                     }
                     else if (app.fw_policy == Random) // random
                     {
