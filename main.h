@@ -262,6 +262,7 @@ struct app_params
     uint64_t tot_cyc;
     uint64_t n_fw;
     uint64_t n_loops;
+    uint64_t n_on_fw;
     int k;
     int ratio_on;
     int ratio_off;

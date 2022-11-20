@@ -110,14 +110,18 @@ void app_main_loop_forwarding(void)
     app.cpu_freq[rte_lcore_id()] = rte_get_tsc_hz();
     app.fwd_item_valid_time = app.cpu_freq[rte_lcore_id()] / 1000 * VALID_TIME;
     uint64_t rtt = app.cpu_freq[rte_lcore_id()] / 1000000 * app.rtt;
+    RTE_LOG(INFO,SWITCH,"rtt=%lu\n",rtt);
     uint64_t init_flowlet_gap = 9 * rtt;
     uint64_t decrease_rate = rtt * 8 / app.k;
     uint64_t ts0, ts1, ts2, ts3;
     app.cyc = 0;
     app.tot_cyc = 0;
     app.n_loops = 0;
-    const uint64_t T_on = app.rtt * app.ratio_on;
-    const uint64_t T_off = app.rtt * app.ratio_on * app.ratio_off;
+    app.n_fw = 0;
+    app.n_on_fw = 0;
+    app.flowlet_counter=0;
+    const uint64_t T_on = rtt * app.ratio_on;
+    const uint64_t T_off = rtt * app.ratio_on * app.ratio_off;
 
     if (app.log_qlen)
     {
@@ -181,8 +185,12 @@ void app_main_loop_forwarding(void)
     status.timestamp = rte_get_tsc_cycles();
     for (i = 0; !force_quit; i = (i + 1) % app.n_ports)
     {
-        app.n_loops++;
-        ts0 = rte_get_tsc_cycles();
+        if(i==app.port)
+        {
+            app.n_loops++;
+            ts0 = rte_get_tsc_cycles();
+        }
+          
         int ret;
 
         /*ret = rte_ring_sc_dequeue_bulk(
@@ -202,6 +210,7 @@ void app_main_loop_forwarding(void)
         }
         else
         {
+            app.n_fw++;
             // dst_port = default_port;
             ipv4_5tuple = rte_pktmbuf_mtod_offset(worker_mbuf->array[0], struct ipv4_5tuple_host *, sizeof(struct ether_hdr) + offsetof(struct ipv4_hdr, time_to_live));
 
@@ -231,6 +240,7 @@ void app_main_loop_forwarding(void)
             }
             else if (ret == 0 && status.on)
             {
+                app.n_on_fw++;
                 ts1 = rte_get_tsc_cycles();
                 if (value.lock)
                 {
@@ -239,8 +249,9 @@ void app_main_loop_forwarding(void)
                 }
                 else
                 {
-                    if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * app.rtt) // letflow
+                    if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * rtt) // letflow
                     {
+                        RTE_LOG(INFO,SWITCH,"now_time - value.last_sent_time=%lu\n",now_time - value.last_sent_time);
                         dst_port = value.last_sent_port;
                         dst_port = rand() % (app.n_ports - 2);
                         if (dst_port >= app.port)
@@ -251,7 +262,7 @@ void app_main_loop_forwarding(void)
                             dst_port++;
                         app.flowlet_counter++;
                     }
-                    else if (app.fw_policy == Conga && (now_time - value.last_sent_time) > 5 * app.rtt) // conga
+                    else if (app.fw_policy == Conga && (now_time - value.last_sent_time) > 5 * rtt) // conga
                     {
                         dst_port = value.last_sent_port;
                         uint32_t min_qlen = UINT32_MAX;
@@ -337,6 +348,7 @@ void app_main_loop_forwarding(void)
             }
             else if (ret < 0)
             {
+                ts1 = rte_get_tsc_cycles();
                 if (app.fw_policy == Halflife)
                 {
                     value.flowlet_gap = init_flowlet_gap;
@@ -357,14 +369,15 @@ void app_main_loop_forwarding(void)
                     value.last_sent_port = dst_port;
                     app_fwd_learning(&key, &value);
                 }
+                ts2 = rte_get_tsc_cycles();
+                app.cyc += (ts2 - ts1);
             }
             if (!status.on && !value.lock)
             {
                 value.lock = 1;
                 app_fwd_learning(&key, &value);
             }
-            ts3 = rte_get_tsc_cycles();
-            app.tot_cyc += (ts3 - ts0);
+            
         }
 
         RTE_LOG(
@@ -372,6 +385,8 @@ void app_main_loop_forwarding(void)
             "%s: Port %d: forward packet to %d\n",
             __func__, i, app.ports[dst_port]);
         packet_enqueue(dst_port, worker_mbuf->array[0]);
-        app.n_fw++;
+        ts3 = rte_get_tsc_cycles();
+        if(i==app.port)
+            app.tot_cyc += (ts3 - ts0);
     }
 }
