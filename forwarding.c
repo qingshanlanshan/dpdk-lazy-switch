@@ -251,7 +251,6 @@ void app_main_loop_forwarding(void)
                 {
                     if (app.fw_policy == Letflow && (now_time - value.last_sent_time) > 5 * rtt) // letflow
                     {
-                        RTE_LOG(INFO,SWITCH,"now_time - value.last_sent_time=%lu\n",now_time - value.last_sent_time);
                         dst_port = value.last_sent_port;
                         dst_port = rand() % (app.n_ports - 2);
                         if (dst_port >= app.port)
